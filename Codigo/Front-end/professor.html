@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel do Professor</title>
+<style>
+  body { font-family: 'Segoe UI'; background: #f0f4f8; margin: 0; }
+  header { background: #1A237E; color: white; padding: 20px; text-align: center; position: relative; }
+  #nome-professor { cursor: pointer; text-decoration: underline; }
+  .logout-btn { position: absolute; top: 20px; right: 20px; background: #e53e3e; border: none; color: white; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+  main { max-width: 1000px; margin: 20px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+  h2 { color: #1A237E; border-bottom: 2px solid #E8EAF6; padding-bottom: 5px; }
+  .disciplina { background: #3949AB; color: white; margin: 5px 0; padding: 10px; border-radius: 8px; font-weight: 500; }
+  .sem-aviso { color: gray; font-style: italic; }
+  textarea { width: 100%; margin-top: 10px; border-radius: 8px; padding: 10px; resize: none; border: 1px solid #ccc; }
+  button { background: #1A237E; color: white; padding: 10px 15px; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+  button:hover { background: #3949AB; }
+  .grade { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  .grade th, .grade td { border: 1px solid #ccc; text-align: center; padding: 8px; }
+  .grade th { background: #1A237E; color: white; }
+  .ocupado { background: #3949AB; color: white; border-radius: 5px; padding: 4px; }
+  .aviso { background: #E8EAF6; padding: 10px; margin-top: 10px; border-radius: 6px; }
+
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 1000; }
+  .modal-content { background: white; padding: 30px; border-radius: 10px; width: 350px; text-align: center; }
+  #foto-perfil { width: 80px; height: 80px; background: #1A237E; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; margin: 0 auto 10px; cursor: pointer; }
+  #fechar-perfil { background: #e53e3e; margin-top: 15px; }
+  #upload-foto { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Bem-vindo, <span id="nome-professor">Professor</span></h1>
+  <button class="logout-btn" onclick="logout()">Sair</button>
+</header>
+
+<input type="file" id="upload-foto" accept="image/*">
+
+<div class="modal" id="modal-perfil">
+  <div class="modal-content">
+    <div id="foto-perfil">👤</div>
+    <h2 id="nome-perfil"></h2>
+    <p><strong>Número de Registro:</strong> <span id="usuario-perfil"></span></p>
+    <p><strong>Função:</strong> Professor</p>
+    <button id="fechar-perfil">Fechar</button>
+  </div>
+</div>
+
+<main>
+  <section>
+    <h2>Minhas Disciplinas</h2>
+    <div id="lista-disciplinas"></div>
+  </section>
+
+  <section>
+    <h2>Grade de Horários</h2>
+    <div id="grade-container"></div>
+  </section>
+
+  <section>
+    <h2>Enviar Aviso</h2>
+    <textarea id="texto-aviso" placeholder="Digite aqui seu aviso para alunos, coordenador e professores..."></textarea>
+    <button onclick="enviarAviso()">Enviar Aviso</button>
+  </section>
+
+  <section>
+    <h2>Avisos Recentes</h2>
+    <div id="lista-avisos"></div>
+  </section>
+</main>
+
+<script>
+  const API_URL = "https://localhost:7072/api"; 
+  const usuario = JSON.parse(sessionStorage.getItem('usuarioLogado'));
+  if (!usuario || usuario.tipo !== 'professor') { window.location.href = 'login.html'; }
+
+  document.getElementById('nome-professor').textContent = usuario.nome || usuario.login;
+
+  async function carregarDados() {
+    try {
+      const res = await fetch(`${API_URL}/alocacoes`);
+      const todas = await res.json();
+      
+      const minhas = todas.filter(a => a.professor_login === usuario.login || a.professor_login === usuario.nome);
+
+      renderizarLista(minhas);
+      renderizarGrade(minhas);
+      carregarAvisos();
+
+    } catch (error) {
+      console.error(error);
+      document.getElementById('lista-disciplinas').innerHTML = "<p>Erro na API.</p>";
+    }
+  }
+
+  function renderizarLista(lista) {
+    const container = document.getElementById('lista-disciplinas');
+    if (lista.length === 0) {
+      container.innerHTML = '<p class="sem-aviso">Nenhuma disciplina encontrada.</p>';
+      return;
+    }
+    const unicas = [...new Set(lista.map(i => i.disciplina))];
+    container.innerHTML = unicas.map(d => {
+        const info = lista.find(x => x.disciplina === d);
+        return `<div class="disciplina">${d} - ${info.sala || 'Sala ND'}</div>`;
+    }).join('');
+  }
+
+  function renderizarGrade(lista) {
+    const container = document.getElementById('grade-container');
+    const dias = ["Seg", "Ter", "Qua", "Qui", "Sex"];
+    const horariosBase = ["08:00", "09:50", "14:00", "15:50", "18:30", "20:20"]; 
+    
+    let tabela = `<table class="grade"><tr><th>Início</th>${dias.map(d=>`<th>${d}</th>`).join('')}</tr>`;
+
+    horariosBase.forEach(h => {
+      tabela += `<tr><td><strong>${h}</strong></td>`;
+      dias.forEach(dia => {
+        const aula = lista.find(m => m.dia_semana === dia && m.hora_inicio && m.hora_inicio.startsWith(h));
+        tabela += `<td>${aula ? `<div class='ocupado'>${aula.disciplina}<br><small>${aula.sala}</small></div>` : ""}</td>`;
+      });
+      tabela += "</tr>";
+    });
+    tabela += "</table>";
+    container.innerHTML = tabela;
+  }
+
+  async function enviarAviso() {
+    const texto = document.getElementById('texto-aviso').value.trim();
+    if (!texto) return alert("Digite um aviso!");
+
+    await fetch(`${API_URL}/avisos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: texto, autor: usuario.nome }) 
+    });
+    
+    document.getElementById('texto-aviso').value = '';
+    alert("Aviso enviado!");
+    carregarAvisos();
+  }
+
+  async function carregarAvisos() {
+    const res = await fetch(`${API_URL}/avisos`);
+    const avisos = await res.json();
+    const lista = document.getElementById('lista-avisos');
+    if (avisos.length === 0) lista.innerHTML = '<p class="sem-aviso">Nenhum aviso.</p>';
+    else lista.innerHTML = avisos.map(a => `<div class="aviso"><strong>${a.autor || 'Sistema'}</strong>: ${a.mensagem}<br><small>${new Date(a.data_publicacao).toLocaleString()}</small></div>`).join('');
+  }
+
+  function logout() {
+    sessionStorage.removeItem('usuarioLogado');
+    window.location.href = 'login.html';
+  }
+
+  const modal = document.getElementById('modal-perfil');
+  document.getElementById('nome-professor').addEventListener('click', () => {
+    modal.style.display = 'flex';
+    document.getElementById('nome-perfil').textContent = usuario.nome;
+    document.getElementById('usuario-perfil').textContent = usuario.login;
+    atualizarFotoPerfil();
+  });
+  document.getElementById('fechar-perfil').addEventListener('click', ()=>modal.style.display='none');
+  const uploadFoto = document.getElementById('upload-foto');
+  document.getElementById('foto-perfil').addEventListener('click', () => uploadFoto.click());
+  uploadFoto.addEventListener('change', function(){
+      const file = this.files[0];
+      if(file){
+          const r = new FileReader();
+          r.onload = e => {
+              localStorage.setItem(`foto_${usuario.login}`, e.target.result);
+              atualizarFotoPerfil();
+          }
+          r.readAsDataURL(file);
+      }
+  });
+  function atualizarFotoPerfil() {
+    const foto = localStorage.getItem(`foto_${usuario.login}`);
+    const el = document.getElementById('foto-perfil');
+    if(foto) { el.style.backgroundImage = `url(${foto})`; el.style.backgroundSize = 'cover'; el.textContent = ''; }
+  }
+
+  carregarDados();
+  atualizarFotoPerfil();
+</script>
+</body>
+</html>
