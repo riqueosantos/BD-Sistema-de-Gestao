@@ -1,2 +1,2 @@
-# BD-Sistema-de-Gestao
+# (BD) - Sistema de Gestão
 Trabalho da disciplina Banco de Dados onde foi feito a especificação de um Sistema de Gestão de horários de disciplinas e implementados algumas funcionalidades.
