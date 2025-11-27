@@ -48,7 +48,7 @@ button:hover { opacity:0.9; }
         <button type="submit" style="background:#90C3FF; color:white;">Adicionar Professor</button>
     </form>
     <table id="tabela-professores">
-        <thead><tr><th>Nome</th><th>Login</th><th>Senha</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Nome</th><th>Login</th><th>Email</th><th>Ação</th></tr></thead>
         <tbody></tbody>
     </table>
 </section>
@@ -164,37 +164,120 @@ button:hover { opacity:0.9; }
         }
     }
 
-    async function carregarProfessores() {
-        const res = await fetch(`${API_URL}/professores`);
-        const profs = await res.json();
-        const tbody = document.querySelector('#tabela-professores tbody');
-        const select = document.getElementById('select-professor');
-        tbody.innerHTML = ''; select.innerHTML = '';
-        profs.forEach(p => {
-            tbody.innerHTML += `<tr><td>${p.nome}</td><td>${p.login || '-'}</td><td>${p.email}</td></tr>`;
-            select.innerHTML += `<option value="${p.id_professor}">${p.nome}</option>`;
+        async function carregarProfessores() {
+        try {
+            const res = await fetch(`${API_URL}/professores`);
+            const profs = await res.json();
+            const tbody = document.querySelector('#tabela-professores tbody');
+            const select = document.getElementById('select-professor');
+            if(tbody) tbody.innerHTML = '';
+            if(select) select.innerHTML = '';
+            profs.forEach(p => {
+                if(tbody) tbody.innerHTML += `<tr><td>${p.nome}</td><td>...</td><td>${p.email}</td></tr>`;
+                if(select) select.innerHTML += `<option value="${p.id_professor}">${p.nome}</option>`;
+            });
+        } catch(e) { console.error(e); }
+    }
+
+    const formProf = document.getElementById('form-professor');
+    if(formProf) {
+        formProf.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const nomeDigitado = document.getElementById('nome-professor').value;
+            const loginDigitado = document.getElementById('login-professor').value;
+            const senhaDigitada = document.getElementById('senha-professor').value;
+
+            try {
+                const dadosUsuario = {
+                    NomeUsuario: loginDigitado,
+                    Senha: senhaDigitada,
+                    Tipo: 'professor'
+                };
+
+                const resUser = await fetch(`${API_URL}/usuarios`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dadosUsuario)
+                });
+
+                if (!resUser.ok) throw new Error("Erro ao criar usuário: " + await resUser.text());
+                
+                const jsonUser = await resUser.json();
+                const idGerado = jsonUser.id;
+
+                const dadosProfessor = {
+                    Nome: nomeDigitado,
+                    Email: `${loginDigitado}@escola.com`, 
+                    IdUsuario: idGerado
+                };
+
+                const resProf = await fetch(`${API_URL}/professores`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(dadosProfessor)
+                });
+
+                if (resProf.ok) {
+                    alert("Professor cadastrado com sucesso!");
+                    carregarProfessores();
+                    e.target.reset();
+                } else {
+                    throw new Error("Erro ao salvar dados do professor: " + await resProf.text());
+                }
+
+            } catch(err) { 
+                alert(err.message); 
+                console.error(err); 
+            }
         });
     }
-    document.getElementById('form-professor').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const dados = { nome: document.getElementById('nome-professor').value, login: document.getElementById('login-professor').value, senha: document.getElementById('senha-professor').value };
-        await fetch(`${API_URL}/professores`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados) });
-        alert("Professor cadastrado!"); carregarProfessores(); e.target.reset();
-    });
 
     async function carregarAlunos() {
-        const res = await fetch(`${API_URL}/alunos`);
-        const alunos = await res.json();
-        const tbody = document.querySelector('#tabela-alunos tbody');
-        tbody.innerHTML = '';
-        alunos.forEach(a => tbody.innerHTML += `<tr><td>${a.nome}</td><td>${a.email}</td><td>${a.matricula}</td></tr>`);
+        try {
+            const res = await fetch(`${API_URL}/alunos`);
+            const alunos = await res.json();
+            const tbody = document.querySelector('#tabela-alunos tbody');
+            if(tbody) {
+                tbody.innerHTML = '';
+                alunos.forEach(a => {
+                    tbody.innerHTML += `<tr><td>${a.nome}</td><td>${a.email}</td><td>${a.matricula}</td></tr>`;
+                });
+            }
+        } catch(e) { console.error(e); }
     }
-    document.getElementById('form-aluno').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const dados = { nome: document.getElementById('nome-aluno').value, login: document.getElementById('login-aluno').value };
-        const res = await fetch(`${API_URL}/alunos`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(dados) });
-        const json = await res.json(); alert("Aluno criado! Matrícula: " + json.matriculaGerada); carregarAlunos(); e.target.reset();
-    });
+
+    const formAluno = document.getElementById('form-aluno');
+    if(formAluno) {
+        formAluno.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const nomeDigitado = document.getElementById('nome-aluno').value;
+            const loginDigitado = document.getElementById('login-aluno').value;
+            
+            const dados = { 
+                Nome: nomeDigitado, 
+                Email: `${loginDigitado}@aluno.com`
+            };
+            
+            try {
+                const res = await fetch(`${API_URL}/alunos`, {
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify(dados)
+                });
+                
+                if(res.ok) {
+                    const json = await res.json(); 
+                    alert("Aluno criado! Matrícula: " + json.matriculaGerada); 
+                    carregarAlunos(); 
+                    e.target.reset();
+                } else {
+                    alert("Erro ao cadastrar aluno: " + await res.text());
+                }
+            } catch(err) { alert("Erro de conexão."); console.error(err); }
+        });
+    }
 
     async function carregarAuxiliaresAlocacao() {
     try {
@@ -228,7 +311,7 @@ button:hover { opacity:0.9; }
         const res = await fetch(`${API_URL}/alocacoes`); listaAlocacoes = await res.json();
         const tbody = document.querySelector('#tabela-alocacoes tbody'); tbody.innerHTML = '';
         listaAlocacoes.forEach(a => {
-            tbody.innerHTML += `<tr><td>${a.disciplina}</td><td>${a.professor}</td><td>${a.sala}</td><td>${a.turno_nome}</td><td><button class="btn-excluir" onclick="removerAlocacao(${a.id_alocacao})">Remover</button></td></tr>`;
+            tbody.innerHTML += `<tr><td>${a.disciplina}</td><td>${a.professor}</td><td><button class="btn-excluir" onclick="removerAlocacao(${a.id_alocacao})">Remover</button></td></tr>`;
         });
         filtrarGrade(periodoAtual || 0);
     }

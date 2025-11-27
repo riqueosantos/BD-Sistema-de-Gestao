@@ -10,6 +10,47 @@ builder.Services.AddCors(options => options.AddPolicy("AllowAll", builder => bui
 var app = builder.Build();
 app.UseCors("AllowAll");
 
+app.MapPost("/api/usuarios", ([FromBody] UsuarioRequest user) => {
+    using var conn = new MySqlConnection(connectionString); conn.Open();
+    try
+    {
+        var cmd = new MySqlCommand("INSERT INTO usuarios (nome_usuario, senha, tipo) VALUES (@nome, @senha, @tipo); SELECT LAST_INSERT_ID();", conn);
+        cmd.Parameters.AddWithValue("@nome", user.NomeUsuario);
+        cmd.Parameters.AddWithValue("@senha", user.Senha);
+        cmd.Parameters.AddWithValue("@tipo", user.Tipo);
+
+        int idGerado = Convert.ToInt32(cmd.ExecuteScalar());
+        return Results.Ok(new { id = idGerado });
+    }
+    catch (Exception ex) { return Results.Problem(ex.Message); }
+});
+
+app.MapPost("/api/professores", ([FromBody] ProfessorRequest prof) => {
+    using var conn = new MySqlConnection(connectionString); conn.Open();
+    try
+    {
+        var cmd = new MySqlCommand("INSERT INTO professores (nome, email, id_usuario) VALUES (@nome, @email, @idUser)", conn);
+        cmd.Parameters.AddWithValue("@nome", prof.Nome);
+        cmd.Parameters.AddWithValue("@email", prof.Email);
+        cmd.Parameters.AddWithValue("@idUser", prof.IdUsuario);
+        cmd.ExecuteNonQuery();
+        return Results.Ok();
+    }
+    catch (Exception ex) { return Results.Problem(ex.Message); }
+});
+
+
+app.MapPost("/api/alunos", ([FromBody] AlunoRequest aluno) => {
+    using var conn = new MySqlConnection(connectionString); conn.Open();
+    int matricula = new Random().Next(100000, 999999);
+    var cmd = new MySqlCommand("INSERT INTO Alunos (nome, matricula, email) VALUES (@nome, @matr, @email)", conn);
+    cmd.Parameters.AddWithValue("@nome", aluno.Nome);
+    cmd.Parameters.AddWithValue("@matr", matricula);
+    cmd.Parameters.AddWithValue("@email", aluno.Email);
+    cmd.ExecuteNonQuery();
+    return Results.Ok(new { matriculaGerada = matricula });
+});
+
 app.MapPost("/api/login", ([FromBody] LoginRequest login) => {
     using var conn = new MySqlConnection(connectionString); conn.Open();
     if (login.Tipo == "aluno")
@@ -142,3 +183,6 @@ static List<Dictionary<string, object>> ExecutarQuery(string connStr, string que
 record LoginRequest(string Usuario, string Senha, string Tipo);
 record AlocacaoRequest(int IdDisciplina, int IdProfessor, int IdSala, int IdTurno, string? DiaSemana);
 record AvisoRequest(string Texto, string Autor);
+record UsuarioRequest(string NomeUsuario, string Senha, string Tipo);
+record ProfessorRequest(string Nome, string Email, int IdUsuario);
+record AlunoRequest(string Nome, string Email);
