@@ -38,9 +38,11 @@ app.MapGet("/api/alocacoes", () => {
     string sql = @"
         SELECT 
             a.id_alocacao,
+            d.id_disciplina,
             d.nome as disciplina,
+            d.periodo,
             p.nome as professor,
-            u.nome_usuario as professor_login,  -- <--- O SEGREDO ESTÁ AQUI
+            u.nome_usuario as professor_login,
             s.numero as sala,
             t.hora_inicio,
             t.hora_fim,
@@ -48,7 +50,7 @@ app.MapGet("/api/alocacoes", () => {
         FROM Alocacoes a
         JOIN Disciplinas d ON a.id_disciplina = d.id_disciplina
         JOIN Professores p ON a.id_professor = p.id_professor
-        LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario -- Busca o login do professor
+        LEFT JOIN usuarios u ON p.id_usuario = u.id_usuario
         JOIN Salas s ON a.id_sala = s.id_sala
         JOIN Turnos t ON a.id_turno = t.id_turno
         ORDER BY a.dia_semana, t.hora_inicio";

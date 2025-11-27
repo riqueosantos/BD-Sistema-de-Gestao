@@ -86,7 +86,7 @@ button:hover { opacity:0.9; }
 <section>
     <h2>Grade de Disciplinas</h2>
     <div class="filtros">
-        <button class="btn-filtro btn-todos ativo" data-periodo="todos">Todos</button>
+        <button class="btn-filtro btn-todos ativo" data-periodo="0">Todos</button>
         <button class="btn-filtro periodo-1" data-periodo="1">1º Período</button>
         <button class="btn-filtro periodo-2" data-periodo="2">2º Período</button>
         <button class="btn-filtro periodo-3" data-periodo="3">3º Período</button>
@@ -111,6 +111,7 @@ button:hover { opacity:0.9; }
 <script>
     const API_URL = "https://localhost:7072/api";
     let listaAlocacoes = [];
+    let periodoAtual = 0;
 
     async function init() {
         await carregarProfessores();
@@ -118,6 +119,19 @@ button:hover { opacity:0.9; }
         await carregarAuxiliaresAlocacao();
         await carregarAlocacoes();
         await carregarAvisos();
+
+        document.querySelectorAll('.btn-filtro').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.btn-filtro').forEach(b => b.classList.remove('ativo'));
+                btn.classList.add('ativo');
+                
+                const periodoString = btn.dataset.periodo;
+                
+                periodoAtual = Number(periodoString);
+                
+                filtrarGrade(periodoAtual); 
+            });
+        });
     }
 
     async function gerarRelatorio(id) {
@@ -216,11 +230,13 @@ button:hover { opacity:0.9; }
         listaAlocacoes.forEach(a => {
             tbody.innerHTML += `<tr><td>${a.disciplina}</td><td>${a.professor}</td><td>${a.sala}</td><td>${a.turno_nome}</td><td><button class="btn-excluir" onclick="removerAlocacao(${a.id_alocacao})">Remover</button></td></tr>`;
         });
-        filtrarGrade(0);
+        filtrarGrade(periodoAtual || 0);
     }
+    
     async function removerAlocacao(id) {
         if(confirm("Remover?")) { await fetch(`${API_URL}/alocacoes/${id}`, { method:'DELETE' }); carregarAlocacoes(); }
     }
+    
     function filtrarGrade(periodo) {
         const container = document.getElementById('grade-container'); container.innerHTML = '';
         const filtradas = periodo === 0 ? listaAlocacoes : listaAlocacoes.filter(a => a.periodo === periodo);
